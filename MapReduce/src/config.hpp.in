@@ -1,0 +1,4 @@
+#pragma once
+
+
+constexpr inline short MAPREDUCE_DEFAULT_PORT = ${MAPREDUCE_DEFAULT_PORT};
