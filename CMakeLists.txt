@@ -14,6 +14,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 include(cmake/CPM.cmake)
+include(GenerateExportHeader)
 
 CPMAddPackage("gh:CLIUtils/CLI11@2.5.0")
 CPMAddPackage(
