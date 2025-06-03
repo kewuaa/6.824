@@ -26,7 +26,7 @@ ASYNCIO_NS::Task<> consume_one(
     workers.pop();
     auto task = TINYRPC_NS::call_func<bool>(c, func_name, args...);
     auto timeout = co_await ASYNCIO_NS::wait_for(task, std::chrono::seconds(10));
-    if (!timeout && task.result()) {
+    if (!timeout && task.result() && *task.result()) {
         workers.push(std::move(c));
         cond.notify_one();
     } else {
@@ -149,8 +149,9 @@ private:
 
 ASYNCIO_NS::Task<> master_task(const Address& self, int max_listen_num) noexcept {
     Master master;
-    auto& rpc = TINYRPC_NS::Server::get();
+    TINYRPC_NS::Server rpc;
     TINYRPC_NS::register_func(
+        rpc,
         "register_map",
         std::function(
             [&master](const Address& worker) {
@@ -159,6 +160,7 @@ ASYNCIO_NS::Task<> master_task(const Address& self, int max_listen_num) noexcept
         )
     );
     TINYRPC_NS::register_func(
+        rpc,
         "register_reduce",
         std::function(
             [&master](const Address& worker) {
@@ -167,6 +169,7 @@ ASYNCIO_NS::Task<> master_task(const Address& self, int max_listen_num) noexcept
         )
     );
     TINYRPC_NS::register_func(
+        rpc,
         "unregister_map",
         std::function(
             [&master](const Address& worker) {
@@ -175,6 +178,7 @@ ASYNCIO_NS::Task<> master_task(const Address& self, int max_listen_num) noexcept
         )
     );
     TINYRPC_NS::register_func(
+        rpc,
         "unregister_reduce",
         std::function(
             [&master](const Address& worker) {
@@ -183,6 +187,7 @@ ASYNCIO_NS::Task<> master_task(const Address& self, int max_listen_num) noexcept
         )
     );
     TINYRPC_NS::register_func(
+        rpc,
         "run",
         std::function([&master](std::vector<std::string> files, std::string out) {
             master.run(std::move(files), std::move(out));

@@ -36,10 +36,13 @@ ASYNCIO_NS::Task<> reduce_task(
 ) noexcept {
     TINYRPC_NS::Client c;
     co_await c.connect(master.host.c_str(), master.port);
-    co_await TINYRPC_NS::call_func<void>(c, "register_reduce", self);
+    if (!co_await TINYRPC_NS::call_func<void>(c, "register_reduce", self)) {
+        SPDLOG_ERROR("register reduce function failed");
+        co_return;
+    }
 
-    auto& rpc = TINYRPC_NS::Server::get();
-    TINYRPC_NS::register_func("reduce", reduce_func);
+    TINYRPC_NS::Server rpc;
+    TINYRPC_NS::register_func(rpc, "reduce", reduce_func);
     rpc.init(self.host.c_str(), self.port, max_listen_num);
     co_await rpc.run();
 }
