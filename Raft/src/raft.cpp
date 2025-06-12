@@ -277,7 +277,14 @@ struct RaftNode::impl {
             if (role != Role::Candidator) {
                 break;
             }
-            co_await task;
+            if constexpr (RAFT_WAIT_TIMEOUT > 0) {
+                auto timeout = co_await ASYNCIO_NS::wait_for(task, std::chrono::milliseconds(RAFT_WAIT_TIMEOUT));
+                if (timeout) {
+                    SPDLOG_INFO("wait for vote task timeout");
+                }
+            } else {
+                co_await task;
+            }
         }
         // election failed, become follower
         if (role == Role::Candidator) {
@@ -421,7 +428,14 @@ struct RaftNode::impl {
         if constexpr (!FirstTime) {
             // wait for log sync done
             for (auto& task : tasks) {
-                co_await task;
+                if constexpr (RAFT_WAIT_TIMEOUT > 0) {
+                    auto timeout = co_await ASYNCIO_NS::wait_for(task, std::chrono::milliseconds(RAFT_WAIT_TIMEOUT));
+                    if (timeout) {
+                        SPDLOG_INFO("wait for sync task timeout");
+                    }
+                } else {
+                    co_await task;
+                }
             }
 
             // update commit index

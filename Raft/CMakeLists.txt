@@ -1,6 +1,7 @@
 set(RAFT_PORT 9999 CACHE STRING "raft port")
 set(RAFT_INNER_PORT 8888 CACHE STRING "raft inner port")
 set(RAFT_MAX_LISTEN_NUM 1024 CACHE STRING "max listen number of socket")
+set(RAFT_WAIT_TIMEOUT -1 CACHE STRING "wait timeout(ms)")
 
 configure_file(src/config.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/raft_config.hpp)
 
