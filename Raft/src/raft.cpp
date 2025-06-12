@@ -17,14 +17,19 @@ RaftNode::Address::Address(std::string_view host, short port) noexcept:
 RaftNode::Address::Address(std::string_view addr) noexcept {
     auto pos = addr.find(':');
     if (pos == std::string_view::npos) {
+        SPDLOG_ERROR("failed to parse address {}", addr);
         exit(EXIT_FAILURE);
     }
     host = addr.substr(0, pos);
-    auto from_chars_result = std::from_chars(
+    auto [ptr, ec] = std::from_chars(
         addr.data()+pos+1,
         addr.data()+addr.size(),
         port
     );
+    if (ec != std::errc()) {
+        SPDLOG_ERROR("failed to parse port: {}", std::make_error_code(ec).message());
+        exit(EXIT_FAILURE);
+    }
 }
 
 
