@@ -25,3 +25,4 @@ CPMAddPackage(
 )
 
 add_subdirectory(MapReduce)
+add_subdirectory(Raft)

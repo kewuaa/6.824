@@ -1,0 +1,4 @@
+#pragma once
+inline constexpr short RAFT_PORT = ${RAFT_PORT};
+inline constexpr short RAFT_INNER_PORT = ${RAFT_INNER_PORT};
+inline constexpr int RAFT_MAX_LISTEN_NUM = ${RAFT_MAX_LISTEN_NUM};
