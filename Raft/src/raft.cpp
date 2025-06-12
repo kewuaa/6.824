@@ -477,7 +477,7 @@ struct RaftNode::impl {
         SPDLOG_DEBUG("================receive append entry request============================");
         SPDLOG_DEBUG("leader term          : {}", req.term);
         SPDLOG_DEBUG("leader address       : {}:{}", req.addr.host, req.addr.port);
-        SPDLOG_DEBUG("leader previous entry: {}, {}", req.prev_entry_term, req.prev_entry_idx);
+        SPDLOG_DEBUG("leader previous entry: term {}, index {}", req.prev_entry_term, req.prev_entry_idx);
         SPDLOG_DEBUG("leader commit index  : {}", req.leader_commit_idx);
         for (auto& entry : req.entries) {
             SPDLOG_DEBUG("entry                : ({}, {})", entry.term, entry.command);
