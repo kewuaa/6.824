@@ -39,7 +39,7 @@ public:
     ~RaftNode() noexcept;
     RaftNode& operator=(RaftNode&) = delete;
     RaftNode& operator=(RaftNode&&) noexcept;
-    ASYNCIO_NS::Task<> run(short inner_port, short port, int max_listen_num) noexcept;
+    ASYNCIO_NS::Task<> run(const char* host, short inner_port, short port, int max_listen_num) noexcept;
 private:
     struct impl;
     impl* _pimpl;

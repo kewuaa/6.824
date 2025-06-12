@@ -11,12 +11,14 @@
 int main(int argc, char** argv) {
     CLI::App app;
     std::vector<std::string> neighbors;
+    std::string host { "127.0.0.1" };
     short port = RAFT_PORT, inner_port = RAFT_INNER_PORT;
     int max_listen_num = RAFT_MAX_LISTEN_NUM;
     std::optional<std::string> log_path = std::nullopt;
     argv = app.ensure_utf8(argv);
 
     app.add_option("--neighbors,-n", neighbors, "neighbor nodes");
+    app.add_option("--host", host, "raft node host");
     app.add_option("--port,-p", port, "extern port");
     app.add_option("--inner-port,-i", inner_port, "inner port");
     app.add_option("--log-path,-l", log_path, "log path");
@@ -36,5 +38,5 @@ int main(int argc, char** argv) {
         fmt::println("run command {}", command);
         fmt::println("===========================================================");
     });
-    ASYNCIO_NS::run(node.run(inner_port, port, max_listen_num));
+    ASYNCIO_NS::run(node.run(host.c_str(), inner_port, port, max_listen_num));
 }

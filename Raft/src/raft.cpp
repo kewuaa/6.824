@@ -561,10 +561,10 @@ struct RaftNode::impl {
             .value_or(false);
     }
 
-    ASYNCIO_NS::Task<> run_inner_rpc(short port, int max_listen_num) noexcept {
-        addr.port = port;
+    ASYNCIO_NS::Task<> run_inner_rpc(const char* host, short port, int max_listen_num) noexcept {
+        addr = { host, port };
         TINYRPC_NS::Server rpc;
-        rpc.init("0.0.0.0", port, RAFT_MAX_LISTEN_NUM);
+        rpc.init(host, port, RAFT_MAX_LISTEN_NUM);
         TINYRPC_NS::register_func(
             rpc,
             "ask_for_vote",
@@ -595,9 +595,9 @@ struct RaftNode::impl {
         co_await rpc.run();
     }
 
-    ASYNCIO_NS::Task<> run_extern_rpc(short port, int max_listen_num) noexcept {
+    ASYNCIO_NS::Task<> run_extern_rpc(const char* host, short port, int max_listen_num) noexcept {
         TINYRPC_NS::Server rpc;
-        rpc.init("0.0.0.0", port, RAFT_MAX_LISTEN_NUM);
+        rpc.init(host, port, RAFT_MAX_LISTEN_NUM);
         TINYRPC_NS::register_func(
             rpc,
             "submit",
@@ -628,10 +628,10 @@ RaftNode::~RaftNode() noexcept {
     free_and_null(_pimpl);
 }
 
-ASYNCIO_NS::Task<> RaftNode::run(short inner_port, short port, int max_listen_num) noexcept {
+ASYNCIO_NS::Task<> RaftNode::run(const char* host, short inner_port, short port, int max_listen_num) noexcept {
     for (auto& task : {
-        _pimpl->run_inner_rpc(inner_port, max_listen_num),
-        _pimpl->run_extern_rpc(port, max_listen_num),
+        _pimpl->run_inner_rpc(host, inner_port, max_listen_num),
+        _pimpl->run_extern_rpc(host, port, max_listen_num),
     }) {
         co_await task;
     }
