@@ -588,7 +588,7 @@ struct RaftNode::impl {
             "inner_submit",
             std::function(
                 [this](std::string&& command) {
-                    return submit(command);
+                    return submit(std::move(command));
                 }
             )
         );
@@ -603,7 +603,7 @@ struct RaftNode::impl {
             "submit",
             std::function(
                 [this](std::string&& command) {
-                    return submit(command);
+                    return submit(std::move(command));
                 }
             )
         );
