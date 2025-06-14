@@ -49,6 +49,8 @@ struct RaftNode::impl {
         TermID term;
         std::string command;
         MSGPACK_DEFINE_ARRAY(term, command);
+
+        ASYNCIO_NS::Event<bool>* ev { nullptr };
     };
     struct VoteRequest {
         Address addr;
@@ -96,7 +98,7 @@ struct RaftNode::impl {
     // std::string host {};
     // short port { -1 }, inner_port { -1 };
     Role role { Role::Follower };
-    std::vector<Entry> logs { 1, { 0, "" } };
+    std::vector<Entry> logs { 1, { 0, "", nullptr } };
     size_t entry_idx { 1 };
     size_t commit_idx { 1 };
     ASYNCIO_NS::Event<bool> commit_event {};
@@ -179,6 +181,10 @@ struct RaftNode::impl {
                 // commit one log entry
                 auto& entry = logs[entry_idx];
                 state_machine(entry.command);
+                // try to wake up submit task
+                if (auto ev = std::exchange(entry.ev, nullptr); ev) {
+                    ev->set(true);
+                }
                 SPDLOG_DEBUG("commit entry {}: {}", entry_idx, entry.command);
             }
             auto stop = co_await commit_event.wait();
@@ -537,8 +543,9 @@ struct RaftNode::impl {
     ASYNCIO_NS::Task<bool> submit(std::string command) noexcept {
         if (role == Role::Leader) {
             SPDLOG_INFO("submit command: {}", command);
-            logs.emplace_back(term, std::move(command));
-            co_return true;
+            ASYNCIO_NS::Event<bool> ev;
+            logs.emplace_back(term, std::move(command), &ev);
+            co_return *(co_await ev.wait());
         }
         if (!leader || !neighbors.contains(*leader)) {
             SPDLOG_WARN("no leader");
