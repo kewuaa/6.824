@@ -304,15 +304,6 @@ struct RaftNode::impl {
         SPDLOG_DEBUG("next index  : {}", node.next_idx);
         SPDLOG_DEBUG("commit index: {}", commit_idx);
         SPDLOG_DEBUG("=================================================");
-        // if during syncing, not send entries
-        if (node.is_syncing) {
-            no_entry = true;
-        }
-
-        // if with entries, set syncing
-        if (!no_entry) {
-            node.is_syncing = true;
-        }
 
         auto new_commit_idx = logs.size();
         AppendEntryRequest req(
@@ -321,7 +312,7 @@ struct RaftNode::impl {
             node.next_idx-1,
             logs[node.next_idx-1].term,
             commit_idx,
-            no_entry
+            no_entry || node.is_syncing // if during syncing, not send entries
                 ? std::vector<Entry>()
                 : std::vector<Entry>(
                     logs.begin()+node.next_idx,
@@ -339,6 +330,8 @@ struct RaftNode::impl {
         }
         while (role == Role::Leader) {
             SPDLOG_INFO("try to append entry to {}:{}", addr.host, addr.port);
+            // if with entries, set syncing
+            node.is_syncing = !req.entries.empty();
             auto res = co_await TINYRPC_NS::call_func<AppendEntryResponse>(
                 *node.client,
                 "ask_for_append_entry",
@@ -380,11 +373,11 @@ struct RaftNode::impl {
                 continue;
             }
 
-            // update next index
-            node.next_idx = new_commit_idx;
+            if (!req.entries.empty()) {
+                // update next index
+                node.next_idx = new_commit_idx;
 
-            // if with entries, unset syncing
-            if (!no_entry) {
+                // unset syncing
                 node.is_syncing = false;
             }
             break;
