@@ -13,9 +13,9 @@ ASYNCIO_NS::Task<> async_main(RaftNode::Address addr, const std::string& command
         SPDLOG_ERROR("connect to {}:{} failed", addr.host, addr.port);
         co_return;
     }
-    auto _ = (co_await TINYRPC_NS::call_func<bool>(c, "submit", command))
-        .transform([](bool success) {
-            if (success) {
+    auto _ = (co_await TINYRPC_NS::call_func<raft::proto::SubmitResult>(c, "submit", command))
+        .transform([](raft::proto::SubmitResult&& res) {
+            if (!res.has_err()) {
                 SPDLOG_INFO("submit success");
             } else {
                 SPDLOG_INFO("submit failed");

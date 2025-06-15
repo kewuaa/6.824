@@ -1,0 +1,12 @@
+syntax = "proto3";
+package raft.proto;
+
+
+message SubmitResult {
+  enum Error {
+    NoLeader = 0;
+    LeaderNoResponse = 1;
+  }
+  optional Error err = 1;
+  bytes data = 2;
+}

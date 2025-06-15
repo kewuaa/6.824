@@ -7,7 +7,6 @@
 
 #include "utils.hpp"
 #include "raft.hpp"
-#include "raft_config.hpp"
 using namespace std::ranges;
 
 
@@ -50,7 +49,7 @@ struct RaftNode::impl {
         std::string command;
         MSGPACK_DEFINE_ARRAY(term, command);
 
-        ASYNCIO_NS::Event<bool>* ev { nullptr };
+        ASYNCIO_NS::Event<std::string>* ev { nullptr };
     };
     struct VoteRequest {
         Address addr;
@@ -180,12 +179,14 @@ struct RaftNode::impl {
             for (; entry_idx < end_idx; ++entry_idx) {
                 // commit one log entry
                 auto& entry = logs[entry_idx];
-                state_machine(entry.command);
+
+                auto res = state_machine(entry.command);
+                SPDLOG_INFO("commit entry ({}, {}) successfully", entry_idx, entry.command);
+
                 // try to wake up submit task
                 if (auto ev = std::exchange(entry.ev, nullptr); ev) {
-                    ev->set(true);
+                    ev->set(std::move(res));;
                 }
-                SPDLOG_DEBUG("commit entry {}: {}", entry_idx, entry.command);
             }
             auto stop = co_await commit_event.wait();
             if (stop && *stop) {
@@ -533,16 +534,21 @@ struct RaftNode::impl {
         return resp;
     }
 
-    ASYNCIO_NS::Task<bool> submit(std::string command) noexcept {
+    ASYNCIO_NS::Task<raft::proto::SubmitResult> submit(std::string command) noexcept {
+        raft::proto::SubmitResult res;
+        res.set_err(raft::proto::SubmitResult_Error_LeaderNoResponse);
         if (role == Role::Leader) {
             SPDLOG_INFO("submit command: {}", command);
-            ASYNCIO_NS::Event<bool> ev;
+            ASYNCIO_NS::Event<std::string> ev;
             logs.emplace_back(term, std::move(command), &ev);
-            co_return *(co_await ev.wait());
+            res.clear_err();
+            res.set_data(*(co_await ev.wait()));
+            co_return std::move(res);
         }
         if (!leader || !neighbors.contains(*leader)) {
             SPDLOG_WARN("no leader");
-            co_return false;
+            res.set_err(raft::proto::SubmitResult_Error_NoLeader);
+            co_return std::move(res);
         }
         auto& node = neighbors[*leader];
         if (!node.client) {
@@ -553,12 +559,15 @@ struct RaftNode::impl {
                 node.client = std::move(c);
             } else {
                 SPDLOG_INFO("leader {}:{} no response, skip", addr.host, addr.port);
-                co_return false;
+                co_return std::move(res);
             }
         }
         SPDLOG_INFO("redirect command `{}` to leader {}:{}", command, leader->host, leader->port);
-        co_return (co_await TINYRPC_NS::call_func<bool>(*node.client, "inner_submit", std::move(command)))
-            .value_or(false);
+        co_return (co_await TINYRPC_NS::call_func<raft::proto::SubmitResult>(
+            *node.client,
+            "inner_submit",
+            std::move(command)
+        )).value_or(std::move(res));
     }
 
     ASYNCIO_NS::Task<> run_inner_rpc(const char* host, short port, int max_listen_num) noexcept {

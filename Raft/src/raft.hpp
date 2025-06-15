@@ -1,12 +1,14 @@
 #pragma once
 #include <tinyrpc.hpp>
 
+#include "raft.pb.h"
+#include "raft_config.hpp"
 #include "raft_export.hpp"
 
 
 class RAFT_EXPORT RaftNode {
 public:
-    using StateMachine = std::function<void(std::string_view)>;
+    using StateMachine = std::function<std::string(std::string_view)>;
     struct Address {
         std::string host {};
         short port { -1 };

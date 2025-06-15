@@ -21,7 +21,7 @@ CPMAddPackage(
     NAME tinyrpc
     GIT_REPOSITORY "https://github.com/kewuaa/tinyrpc.git"
     GIT_TAG master
-    OPTIONS "BUILD_TESTS OFF"
+    OPTIONS "BUILD_TESTS OFF" "TINYRPC_ENABLE_PROTOBUF TRUE"
 )
 
 add_subdirectory(MapReduce)

@@ -37,6 +37,7 @@ int main(int argc, char** argv) {
         fmt::println("===========================================================");
         fmt::println("run command {}", command);
         fmt::println("===========================================================");
+        return std::string();
     });
     ASYNCIO_NS::run(node.run(host.c_str(), inner_port, port, max_listen_num));
 }
