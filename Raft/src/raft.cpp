@@ -305,8 +305,16 @@ struct RaftNode::impl {
         SPDLOG_DEBUG("next index  : {}", node.next_idx);
         SPDLOG_DEBUG("commit index: {}", commit_idx);
         SPDLOG_DEBUG("=================================================");
+        if (!node.client) {
+            TINYRPC_NS::Client c;
+            if (co_await c.connect(addr.host.c_str(), addr.port)) {
+                node.client = std::move(c);
+            } else {
+                SPDLOG_INFO("node {}:{} no response, skip", addr.host, addr.port);
+                co_return;
+            }
+        }
 
-        auto new_commit_idx = logs.size();
         AppendEntryRequest req(
             term,
             this->addr,
@@ -317,22 +325,17 @@ struct RaftNode::impl {
                 ? std::vector<Entry>()
                 : std::vector<Entry>(
                     logs.begin()+node.next_idx,
-                    logs.begin()+new_commit_idx
+                    logs.end()
                 )
         );
-        if (!node.client) {
-            TINYRPC_NS::Client c;
-            if (co_await c.connect(addr.host.c_str(), addr.port)) {
-                node.client = std::move(c);
-            } else {
-                SPDLOG_INFO("node {}:{} no response, skip", addr.host, addr.port);
-                co_return;
-            }
+        bool own_node = false;
+        // entries not empty, own node and set syncing to avoid owned by others
+        if (!req.entries.empty()) {
+            own_node = true;
+            node.is_syncing = true;
         }
         while (role == Role::Leader) {
             SPDLOG_INFO("try to append entry to {}:{}", addr.host, addr.port);
-            // if with entries, set syncing
-            node.is_syncing = !req.entries.empty();
             auto res = co_await TINYRPC_NS::call_func<AppendEntryResponse>(
                 *node.client,
                 "ask_for_append_entry",
@@ -342,6 +345,7 @@ struct RaftNode::impl {
             // maybe connection closed
             // reset client
             if (!res) {
+                SPDLOG_INFO("connection to {}:{} closed", addr.host, addr.port);
                 node.client.reset();
                 break;
             }
@@ -360,30 +364,38 @@ struct RaftNode::impl {
                     become_follower();
                     break;
                 }
+                // not own node, try own node or else no need to retry
+                if (!own_node) {
+                    if (node.is_syncing) {
+                        break;
+                    }
+                    own_node = true;
+                    node.is_syncing = true;
+                }
                 assert(node.next_idx > 0);
+                // log back
                 // adjust previous entry index and retry
+                // no need to transport entries
                 --node.next_idx;
                 req.prev_entry_idx = node.next_idx - 1;
                 req.prev_entry_term = logs[node.next_idx-1].term;
-                if (!no_entry) {
-                    req.entries = {
-                        logs.begin()+node.next_idx,
-                        logs.begin()+new_commit_idx,
-                    };
+                if (!req.entries.empty()) {
+                    req.entries.resize(0);
                 }
                 continue;
             }
 
             if (!req.entries.empty()) {
                 // update next index
-                node.next_idx = new_commit_idx;
-
-                // unset syncing
-                node.is_syncing = false;
+                node.next_idx += req.entries.size();
             }
+            SPDLOG_INFO("sync to {}:{} successfully", addr.host, addr.port);
             break;
         }
-        SPDLOG_INFO("sync to {}:{} successfully", addr.host, addr.port);
+        // if own node, unset syncing
+        if (own_node) {
+            node.is_syncing = false;
+        }
     }
 
     void update_commit_idx() noexcept {
