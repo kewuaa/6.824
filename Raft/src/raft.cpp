@@ -229,8 +229,7 @@ struct RaftNode::impl {
         std::vector<ASYNCIO_NS::Task<VoteResponse, TINYRPC_NS::RPCError>> tasks;
         const std::string func_name  { "ask_for_vote" };
         // ask each node for vote request
-        for (auto [i, item] : neighbors | views::enumerate) {
-            auto& [addr, node] = item;
+        for (auto& [addr, node] : neighbors) {
             if (!node.client) {
                 SPDLOG_INFO("try connect to {}:{}", addr.host, addr.port);
                 TINYRPC_NS::Client c;
