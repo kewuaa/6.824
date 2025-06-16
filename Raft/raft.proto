@@ -6,6 +6,7 @@ message SubmitResult {
   enum Error {
     NoLeader = 0;
     LeaderNoResponse = 1;
+    DuplicateCommand = 2;
   }
   optional Error err = 1;
   bytes data = 2;

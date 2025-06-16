@@ -4,6 +4,7 @@
 #include "raft.pb.h"
 #include "raft_config.hpp"
 #include "raft_export.hpp"
+using CommandID = size_t;
 
 
 class RAFT_EXPORT RaftNode {

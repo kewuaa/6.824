@@ -105,6 +105,7 @@ struct RaftNode::impl {
     std::optional<Address> voted_node { std::nullopt };
     std::optional<Address> leader { std::nullopt };
     std::map<Address, NodeInfo> neighbors {};
+    std::unordered_map<std::string, CommandID> last_cmd_id {};
     std::shared_ptr<ASYNCIO_NS::Timer> election_timer { nullptr };
     std::shared_ptr<ASYNCIO_NS::Timer> heart_beat_timer { nullptr };
 
@@ -545,17 +546,31 @@ struct RaftNode::impl {
         return resp;
     }
 
-    ASYNCIO_NS::Task<raft::proto::SubmitResult> submit(std::string command) noexcept {
+    ASYNCIO_NS::Task<raft::proto::SubmitResult> submit(std::string client_name, CommandID cmd_id, std::string command) noexcept {
         raft::proto::SubmitResult res;
         res.set_err(raft::proto::SubmitResult_Error_LeaderNoResponse);
+
+        // duplicate command id
+        if (last_cmd_id.contains(client_name) && cmd_id <= last_cmd_id[client_name]) {
+            SPDLOG_INFO("command `{}` from ({}, {}) duplicate", command, client_name, cmd_id);
+            res.set_err(raft::proto::SubmitResult_Error_DuplicateCommand);
+            co_return std::move(res);
+        }
+
+        // update command id
+        last_cmd_id[client_name] = cmd_id;
+
+        // as leader, directly submit command
         if (role == Role::Leader) {
-            SPDLOG_INFO("submit command: {}", command);
+            SPDLOG_INFO("submit command `{}` from ({}, {})", command, client_name, cmd_id);
             ASYNCIO_NS::Event<std::string> ev;
             logs.emplace_back(term, std::move(command), &ev);
             res.clear_err();
             res.set_data(*(co_await ev.wait()));
             co_return std::move(res);
         }
+
+        // as follower, try find leader and redirect request to leader
         if (!leader || !neighbors.contains(*leader)) {
             SPDLOG_WARN("no leader");
             res.set_err(raft::proto::SubmitResult_Error_NoLeader);
@@ -573,10 +588,19 @@ struct RaftNode::impl {
                 co_return std::move(res);
             }
         }
-        SPDLOG_INFO("redirect command `{}` to leader {}:{}", command, leader->host, leader->port);
+        SPDLOG_INFO(
+            "redirect command `{}` from ({}, {}) to leader {}:{}",
+            command,
+            client_name,
+            cmd_id,
+            leader->host,
+            leader->port
+        );
         co_return (co_await TINYRPC_NS::call_func<raft::proto::SubmitResult>(
             *node.client,
             "inner_submit",
+            std::move(addr),
+            cmd_id,
             std::move(command)
         )).value_or(std::move(res));
     }
@@ -607,8 +631,8 @@ struct RaftNode::impl {
             rpc,
             "inner_submit",
             std::function(
-                [this](std::string&& command) {
-                    return submit(std::move(command));
+                [this](std::string&& client_name, CommandID cmd_id, std::string&& command) {
+                    return submit(std::move(client_name), cmd_id, std::move(command));
                 }
             )
         );
@@ -622,8 +646,8 @@ struct RaftNode::impl {
             rpc,
             "submit",
             std::function(
-                [this](std::string&& command) {
-                    return submit(std::move(command));
+                [this](std::string&& client_name, CommandID cmd_id, std::string&& command) {
+                    return submit(std::move(client_name), cmd_id, std::move(command));
                 }
             )
         );
