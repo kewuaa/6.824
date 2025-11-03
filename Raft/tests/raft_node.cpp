@@ -1,3 +1,5 @@
+#include <print>
+
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <CLI/App.hpp>
@@ -34,9 +36,9 @@ int main(int argc, char** argv) {
     spdlog::set_level(spdlog::level::debug);
 
     RaftNode node(neighbors, [](std::string_view command) {
-        fmt::println("===========================================================");
-        fmt::println("run command {}", command);
-        fmt::println("===========================================================");
+        std::println("===========================================================");
+        std::println("run command {}", command);
+        std::println("===========================================================");
         return std::string();
     });
     ASYNCIO_NS::run(node.run(host.c_str(), inner_port, port, max_listen_num));
