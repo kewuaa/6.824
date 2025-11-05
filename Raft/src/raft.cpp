@@ -94,8 +94,6 @@ struct RaftNode::impl {
 
     TermID term { 0 };
     Address addr { "127.0.0.1", -1 };
-    // std::string host {};
-    // short port { -1 }, inner_port { -1 };
     Role role { Role::Follower };
     std::vector<Entry> logs { 1, { 0, "", nullptr } };
     size_t entry_idx { 1 };
